@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { Voter, Nomination, Booth, Poll, Setting, ElectionType } = require('./models');
 
 const app = express();
@@ -573,15 +574,43 @@ app.post('/api/election-types/:id/subtypes', async (req, res) => {
 });
 
 // ==========================================
-// 3. FRONTEND PRODUCTION BUNDLE STATIC FILES
+// 3. STATIC FILES & API ROOT HANDLER
 // ==========================================
 
 const staticPath = path.join(__dirname, '../frontend/dist');
-app.use(express.static(staticPath));
+const indexPath = path.join(staticPath, 'index.html');
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(staticPath, 'index.html'));
-});
+if (fs.existsSync(indexPath)) {
+    app.use(express.static(staticPath));
+    app.get('*', (req, res) => {
+        res.sendFile(indexPath);
+    });
+} else {
+    // Standalone API mode (e.g. Render / Cloud deployment)
+    app.get('/', (req, res) => {
+        res.json({
+            status: 'online',
+            service: 'Aadhaar Electronic Voting System - Backend API',
+            version: '1.0.0',
+            endpoints: {
+                voters: '/api/voters',
+                voterAuth: 'POST /api/voters/auth',
+                nominations: '/api/nominations',
+                booths: '/api/booths',
+                vote: 'POST /api/vote',
+                polls: '/api/polls',
+                settings: '/api/settings',
+                electionTypes: '/api/election-types'
+            }
+        });
+    });
+
+    app.get('*', (req, res) => {
+        if (!req.path.startsWith('/api')) {
+            return res.status(404).json({ error: 'Endpoint not found. API root is available at /' });
+        }
+    });
+}
 
 // Start Server
 app.listen(PORT, () => {
